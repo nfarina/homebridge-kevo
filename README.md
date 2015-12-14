@@ -7,6 +7,7 @@ Example config.json:
       "accessories": [
         {
             "accessory": "Kevo",
+            "name": "Front Door",
             "username": "test@example.com",
             "password": "<your kevo password>"
         }
