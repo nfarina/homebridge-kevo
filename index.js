@@ -11,18 +11,23 @@ module.exports = function(homebridge) {
 
 function KevoAccessory(log, config) {
   this.log = log;
+  this.name = config["name"];
   this.username = config["username"];
   this.password = config["password"];
+  this.lockId = config["lock_id"];
 
   this.service = new Service.LockMechanism(this.name);
   
-  // this.service
-  //   .getCharacteristic(Characteristic.LockCurrentState)
-  //   .on('get', this.getState.bind(this));
+  this.service
+    .getCharacteristic(Characteristic.LockCurrentState)
+    .on('get', this.getState.bind(this));
   
+
   this.service
     .getCharacteristic(Characteristic.LockTargetState)
-    //.on('get', this.getState.bind(this))
+    .on('get', this.getState.bind(this));
+  this.service
+    .getCharacteristic(Characteristic.LockTargetState)
     .on('set', this.setState.bind(this));
   
   this._setup();
@@ -33,24 +38,7 @@ KevoAccessory.prototype._setup = function() {
     if (err) {
       this.log("There was a problem logging into Kevo. Check your username and password.");
       return;
-    }
-    
-    this._getLocks(function(err, locks) {
-      if (err) {
-        this.log("Couldn't fetch locks.");
-        return;
-      }
-      
-      if (locks.length !== 1) {
-        this.log("Expected exactly one Kevo lock; found " + locks.length);
-        return;
-      }
-      
-      // found our one supported lock [TODO: support multiple locks]
-      this.lockID = locks[0];
-      this.log("Using Lock ID " + this.lockID);
-      
-    }.bind(this));
+    } 
   }.bind(this));
 }
 
@@ -118,29 +106,29 @@ KevoAccessory.prototype._login = function(callback) {
   }.bind(this));
 }
 
-KevoAccessory.prototype._getLocks = function(callback) {
+KevoAccessory.prototype._checkLockExists = function(callback) {
   var url = "https://www.mykevo.com/user/locks";
   
   request(url, function(err, response, body) {
     if (!err && response.statusCode == 200) {
-      
       var $ = cheerio.load(body);
       var lockMap = {};
       
       // pull out all elements with "data-lock-id" defined
       $('*[data-lock-id]').each(function(i, elem) {
-        var lockID = $(elem).attr('data-lock-id');
-        lockMap[lockID] = lockID;
+        var lockId = $(elem).attr('data-lock-id');
+        if (lockId == this.lockId) {
+          callback(null);
+          return;
+        }
       }.bind(this));
-      
-      var locks = [];
-      for (var lockID in lockMap) { locks.push(lockID); }
-      
-      callback(null, locks);
+
+      err = new Error("Could not locate lock with ID: %s", this.lockId);
+      callback(err);
     }
     else {
       err = err || new Error("Invalid status code " + response.statusCode);
-      this.log("Error fetching locks: %s", err);
+      this.log("Error fetching lock: %s", err);
       callback(err);
     }
   }.bind(this));
@@ -149,7 +137,7 @@ KevoAccessory.prototype._getLocks = function(callback) {
 KevoAccessory.prototype._getLockStatus = function(callback) {
   var url = "https://www.mykevo.com/user/remote_locks/command/lock.json";
   var qs = {
-    arguments: this.lockID
+    arguments: this.lockId
   };
   request(url, {qs:qs}, function(err, response, body) {
 
@@ -183,7 +171,7 @@ KevoAccessory.prototype._setLockStatus = function(status, callback) {
   }
     
   var qs = {
-    arguments: this.lockID
+    arguments: this.lockId
   };
   
   request(url, {qs:qs}, function(err, response, body) {
@@ -209,8 +197,8 @@ KevoAccessory.prototype._setLockStatus = function(status, callback) {
 }
 
 KevoAccessory.prototype.getState = function(callback, state) {
-  if (!this.lockID) {
-    this.log("Lock not yet discovered; can't get current state.");
+  if (!this.lockId) {
+    this.log("Lock has no ID assigned; can't get current state.");
     return;
   }
 
@@ -241,8 +229,8 @@ KevoAccessory.prototype.getState = function(callback, state) {
 }
   
 KevoAccessory.prototype.setState = function(state, callback) {
-  if (!this.lockID) {
-    this.log("Lock not yet discovered; can't set current state.");
+  if (!this.lockId) {
+    this.log("Lock has no ID assigned; can't set current state");
     return;
   }
 
