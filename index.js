@@ -39,6 +39,9 @@ KevoAccessory.prototype._setup = function() {
       this.log("There was a problem logging into Kevo. Check your username and password.");
       return;
     } 
+    else {
+      this._checkLockExists(function(err) {});
+    }
   }.bind(this));
 }
 
@@ -112,19 +115,29 @@ KevoAccessory.prototype._checkLockExists = function(callback) {
   request(url, function(err, response, body) {
     if (!err && response.statusCode == 200) {
       var $ = cheerio.load(body);
-      var lockMap = {};
+      var seenLockIds = [];
       
       // pull out all elements with "data-lock-id" defined
       $('*[data-lock-id]').each(function(i, elem) {
         var lockId = $(elem).attr('data-lock-id');
-        if (lockId == this.lockId) {
+
+        if (this.lockId == null && seenLockIds.indexOf(lockId) < 0) {
+          seenLockIds.push(lockId);
+        }
+        else if (lockId == this.lockId) {
           callback(null);
           return;
         }
       }.bind(this));
 
-      err = new Error("Could not locate lock with ID: %s", this.lockId);
-      callback(err);
+      if (this.lockId == null) {
+        this.log("No lock ID specified, list of possible lock IDs: ");
+        this.log(seenLockIds);
+      }
+      else {
+        err = new Error("Could not locate lock with ID: %s", this.lockId);
+        callback(err);
+      }
     }
     else {
       err = err || new Error("Invalid status code " + response.statusCode);
