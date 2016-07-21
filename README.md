@@ -22,6 +22,6 @@ Example config.json:
       ]
     }
 
-Find "lock_id" values by logging in to your Kevo account on a web browser, then inspecting the page source and looking for "data-lock-id". The surrounding pieces of data should identify which lock is which.
+Find "lock_id" values by excluding lock_id from your config.json. When you start homebridge the next time, all "lock_id" values for your Kevo account will be printed in the logs.
 
-NOTE: When modifying lock state rapidly or as a group, only the first request will work. The lock state must be modified with a short gap in between requests. This is true even on Kevo's own website when attempting to modify the state of multiple locks at once.
+NOTE: When commanding groups of locks, there will be a 15 second delay between each lock command firing because Kevo does not support rapid API requests. This causes Siri to usually say "Sorry x, I didn't hear back" as a result.
