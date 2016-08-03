@@ -9,20 +9,29 @@ module.exports = function(homebridge) {
   homebridge.registerAccessory("homebridge-kevo", "Kevo", KevoAccessory);
 }
 
+var lockOrder = 0;
+var lockEventSpacing = 15000;
+var lockEventsOccurring = 0;
+
 function KevoAccessory(log, config) {
   this.log = log;
+  this.name = config["name"];
   this.username = config["username"];
   this.password = config["password"];
+  this.lockId = config["lock_id"];
+  this.lockOrder = lockOrder++;
 
   this.service = new Service.LockMechanism(this.name);
   
-  // this.service
-  //   .getCharacteristic(Characteristic.LockCurrentState)
-  //   .on('get', this.getState.bind(this));
+  this.service
+    .getCharacteristic(Characteristic.LockCurrentState)
+    .on('get', this.getState.bind(this));
   
   this.service
     .getCharacteristic(Characteristic.LockTargetState)
-    //.on('get', this.getState.bind(this))
+    .on('get', this.getState.bind(this));
+  this.service
+    .getCharacteristic(Characteristic.LockTargetState)
     .on('set', this.setState.bind(this));
   
   this._setup();
@@ -33,24 +42,10 @@ KevoAccessory.prototype._setup = function() {
     if (err) {
       this.log("There was a problem logging into Kevo. Check your username and password.");
       return;
+    } 
+    else {
+      this._checkLockExists(function(err) {});
     }
-    
-    this._getLocks(function(err, locks) {
-      if (err) {
-        this.log("Couldn't fetch locks.");
-        return;
-      }
-      
-      if (locks.length !== 1) {
-        this.log("Expected exactly one Kevo lock; found " + locks.length);
-        return;
-      }
-      
-      // found our one supported lock [TODO: support multiple locks]
-      this.lockID = locks[0];
-      this.log("Using Lock ID " + this.lockID);
-      
-    }.bind(this));
   }.bind(this));
 }
 
@@ -118,29 +113,39 @@ KevoAccessory.prototype._login = function(callback) {
   }.bind(this));
 }
 
-KevoAccessory.prototype._getLocks = function(callback) {
+KevoAccessory.prototype._checkLockExists = function(callback) {
   var url = "https://www.mykevo.com/user/locks";
   
   request(url, function(err, response, body) {
     if (!err && response.statusCode == 200) {
-      
       var $ = cheerio.load(body);
-      var lockMap = {};
+      var seenLockIds = [];
       
       // pull out all elements with "data-lock-id" defined
       $('*[data-lock-id]').each(function(i, elem) {
-        var lockID = $(elem).attr('data-lock-id');
-        lockMap[lockID] = lockID;
+        var lockId = $(elem).attr('data-lock-id');
+
+        if (this.lockId == null && seenLockIds.indexOf(lockId) < 0) {
+          seenLockIds.push(lockId);
+        }
+        else if (lockId == this.lockId) {
+          callback(null);
+          return;
+        }
       }.bind(this));
-      
-      var locks = [];
-      for (var lockID in lockMap) { locks.push(lockID); }
-      
-      callback(null, locks);
+
+      if (this.lockId == null) {
+        this.log("No lock ID specified, list of possible lock IDs: ");
+        this.log(seenLockIds);
+      }
+      else {
+        err = new Error("Could not locate lock with ID: %s", this.lockId);
+        callback(err);
+      }
     }
     else {
       err = err || new Error("Invalid status code " + response.statusCode);
-      this.log("Error fetching locks: %s", err);
+      this.log("Error fetching lock: %s", err);
       callback(err);
     }
   }.bind(this));
@@ -149,7 +154,7 @@ KevoAccessory.prototype._getLocks = function(callback) {
 KevoAccessory.prototype._getLockStatus = function(callback) {
   var url = "https://www.mykevo.com/user/remote_locks/command/lock.json";
   var qs = {
-    arguments: this.lockID
+    arguments: this.lockId
   };
   request(url, {qs:qs}, function(err, response, body) {
 
@@ -183,7 +188,7 @@ KevoAccessory.prototype._setLockStatus = function(status, callback) {
   }
     
   var qs = {
-    arguments: this.lockID
+    arguments: this.lockId
   };
   
   request(url, {qs:qs}, function(err, response, body) {
@@ -209,8 +214,8 @@ KevoAccessory.prototype._setLockStatus = function(status, callback) {
 }
 
 KevoAccessory.prototype.getState = function(callback, state) {
-  if (!this.lockID) {
-    this.log("Lock not yet discovered; can't get current state.");
+  if (!this.lockId) {
+    this.log("Lock has no ID assigned; can't get current state.");
     return;
   }
 
@@ -236,46 +241,61 @@ KevoAccessory.prototype.getState = function(callback, state) {
         this.log("Error getting state: %s", err);
         callback(err);
       }
+
     }.bind(this));
   }.bind(this));
 }
   
 KevoAccessory.prototype.setState = function(state, callback) {
-  if (!this.lockID) {
-    this.log("Lock not yet discovered; can't set current state.");
+  if (!this.lockId) {
+    this.log("Lock has no ID assigned; can't set current state");
     return;
   }
 
   var kevoStatus = (state == Characteristic.LockTargetState.SECURED) ? "Locked" : "Unlocked";
 
-  this.log("Setting status to %s", kevoStatus);
-  
   this._login(function(err) {
     if (err) {
       callback(err);
       return;
     }
-    
-    this._setLockStatus(kevoStatus, function(err) {
+
+    var lockStatusCallback = function(err) {
       if (err) {
         this.log("Error setting state: %s", err);
         callback(err);
+        lockEventsOccurring--;
         return;
       }
 
       // we succeeded, so update the "current" state as well
       var currentState = (state == Characteristic.LockTargetState.SECURED) ?
         Characteristic.LockCurrentState.SECURED : Characteristic.LockCurrentState.UNSECURED;
-      
       this.service
         .setCharacteristic(Characteristic.LockCurrentState, currentState);
       
       // success
+      lockEventsOccurring--;
       callback(null);
       
-    }.bind(this));
+    }.bind(this);
+
+    if (lockEventsOccurring > 0) {
+      lockEventsOccurring++;
+      setTimeout(function() {
+        this.log("Setting status to %s", kevoStatus);
+        this._setLockStatus(kevoStatus, lockStatusCallback);
+      }.bind(this), this.lockOrder * lockEventSpacing);
+    }
+    else {
+      lockEventsOccurring++;
+      this.log("Setting status to %s", kevoStatus);
+      this._setLockStatus(kevoStatus, lockStatusCallback);
+    }
+  
   }.bind(this));
-},
+
+}
 
 KevoAccessory.prototype.getServices = function() {
   return [this.service];
