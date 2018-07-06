@@ -285,7 +285,7 @@ KevoAccessory.prototype.setState = function(state, callback) {
       setTimeout(function() {
         this.log("Setting status to %s", kevoStatus);
         this._setLockStatus(kevoStatus, lockStatusCallback);
-      }.bind(this), this.lockOrder * lockEventSpacing);
+      }.bind(this), lockEventsOccurring * lockEventSpacing);
     }
     else {
       lockEventsOccurring++;
