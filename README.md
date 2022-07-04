@@ -12,18 +12,22 @@ Example config.json:
             "name": "Front Door",
             "username": "test@example.com",
             "password": "<your kevo password>",
-            "lock_id": "<your lock id>"
+            "lock_id": "<your lock id>",
+            "serialNumber": "<RANDOM STRING HERE>"
         },
         {
             "accessory": "Kevo",
             "name": "Back Door",
             "username": "test@example.com",
             "password": "<your kevo password>",
-            "lock_id": "<your lock id>"
+            "lock_id": "<your lock id>",
+            "serialNumber": "<RANDOM STRING HERE>"
         },
       ]
     }
 
-Kevo now provides the lock IDs from the web portal or app within the lock detail information. You can also find "lock_id" values by excluding lock_id from your config.json. When you start homebridge the next time, all "lock_id" values for your Kevo account will be printed in the logs.
+Kevo now provides the lock IDs from the web portal or app within the lock detail information. 
+
+Use a random serial number for each lock so that when importing to Home Assistant all locks come across instead of just one.
 
 NOTE: When commanding groups of locks, there will be a 15 second delay between each lock command firing because Kevo does not support rapid API requests. This causes Siri to usually say "Sorry x, I didn't hear back" as a result.
