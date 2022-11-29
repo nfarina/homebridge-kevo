@@ -1,5 +1,5 @@
 {
-  "name": "homebridge-kevo",
+  "name": "homebridge-kevo-withserial",
   "version": "0.0.10",
   "description": "Kevo support for Homebridge: https://github.com/nfarina/homebridge",
   "license": "ISC",
