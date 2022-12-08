@@ -1,0 +1,35 @@
+{
+  "pluginAlias": "Kevo",
+  "pluginType": "accessory",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "name",
+        "type": "string",
+        "required": true,
+        "default": "Front Door"
+      },
+      "username": {
+        "title": "User Name",
+        "type": "string",
+        "required": true,
+        "default": "",
+        "description": "Usually your email address."
+      },
+      "password": {
+        "title": "Password",
+        "type": "string",
+        "required": true,
+        "default": "",
+        "description": "Password associated with your username."
+      },
+      "lock_id": {
+        "title": "Lock ID",
+        "type": "string",
+        "default": "",
+        "description": "Kevo now provides the lock IDs from the web portal or app within the lock detail information. You can also find \"lock_id\" values by excluding lock_id from your config.json. When you start homebridge the next time, all \"lock_id\" values for your Kevo account will be printed in the logs."
+      }
+   }
+  }
+}
