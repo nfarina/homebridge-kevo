@@ -53,7 +53,7 @@ KevoAccessory.prototype._login = function(callback) {
   var url = "https://www.mykevo.com/login";
 
   var followRedirect = function(response) {
-    if (response.headers.location === "https://www.mykevo.com/user/locks") {
+    if ((response.headers.location === "https://www.mykevo.com/user/locks") || (response.headers.location === "https://mykevo.com/user/locks")) {
       this.log("Already logged in.");
       callback(null);
       return false; // don't follow this redirect, we're done
@@ -93,9 +93,24 @@ KevoAccessory.prototype._login = function(callback) {
       // Submit the login page
       request.post(action, {form:form}, function(err, response, body) {
         // we expect a redirect response
-        if (!err && response.statusCode == 302) {
-          this.log("Login successful.");
-          callback(null);
+        if (!err) {
+          if (response.statusCode == 302) { // expect a redirect to the locks page
+            this.log("Login successful.");
+            callback(null);
+          } else if (response.statusCode == 200) { // check for failed login
+            if (body.indexOf("Username or password is incorrect") >= 0) {
+              err = err || new Error("Login failure - incorrect username or password");
+              this.log(err);
+              callback(err);
+            } else {
+              this.log("Login successful."); // session login was successful but redirect blocked by reCAPTCHA
+              callback(null);
+            }
+          } else { // unexpected response code
+            err = err || new Error("Unexpected status code " + response.statusCode);
+            this.log("Error submitting login page: %s", err);
+            callback(err);
+          }
         }
         else {
           err = err || new Error("Bad status code " + response.statusCode);
