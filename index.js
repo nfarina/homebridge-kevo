@@ -50,10 +50,10 @@ KevoAccessory.prototype._setup = function() {
 }
 
 KevoAccessory.prototype._login = function(callback) {
-  var url = "https://www.mykevo.com/login";
+  var url = "https://mykevo.com/login";
 
   var followRedirect = function(response) {
-    if ((response.headers.location === "https://www.mykevo.com/user/locks") || (response.headers.location === "https://mykevo.com/user/locks")) {
+    if ((response.headers.location === "https://mykevo.com/user/locks") || (response.headers.location === "https://mykevo.com/user/locks")) {
       this.log("Already logged in.");
       callback(null);
       return false; // don't follow this redirect, we're done
@@ -129,7 +129,7 @@ KevoAccessory.prototype._login = function(callback) {
 }
 
 KevoAccessory.prototype._checkLockExists = function(callback) {
-  var url = "https://www.mykevo.com/user/locks";
+  var url = "https://mykevo.com/user/locks";
   
   request(url, function(err, response, body) {
     if (!err && response.statusCode == 200) {
@@ -167,7 +167,7 @@ KevoAccessory.prototype._checkLockExists = function(callback) {
 }
 
 KevoAccessory.prototype._getLockStatus = function(callback) {
-  var url = "https://www.mykevo.com/user/remote_locks/command/lock.json";
+  var url = "https://mykevo.com/user/remote_locks/command/lock.json";
   var qs = {
     arguments: this.lockId
   };
@@ -191,10 +191,10 @@ KevoAccessory.prototype._setLockStatus = function(status, callback) {
   var url;
   
   if (status === "Locked") {
-    url = "https://www.mykevo.com/user/remote_locks/command/remote_lock.json";
+    url = "https://mykevo.com/user/remote_locks/command/remote_lock.json";
   }
   else if (status === "Unlocked") {
-    url = "https://www.mykevo.com/user/remote_locks/command/remote_unlock.json";
+    url = "https://mykevo.com/user/remote_locks/command/remote_unlock.json";
   }
   else {
     this.log("Invalid lock status %s", status);
